@@ -9,6 +9,8 @@ from scriba_ekf.ekf import ExtendedKalmanFilter
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from tf2 import TransformBroadcaster
 
+from scriba_ekf.robot_model import ScribaRobotModel
+
 class ScribaEKFNode:
     """ROS node wrapper for the Scriba robot position EKF"""
 
@@ -19,8 +21,7 @@ class ScribaEKFNode:
         # Check that EKF parameters are valid
         if self.check_ekf_params(ekf_param):
             # Create filter
-            self.position_ekf = ExtendedKalmanFilter(ekf_param['Fu'],
-                                                     ekf_param['Fx'],
+            self.position_ekf = ExtendedKalmanFilter(ScribaRobotModel(ekf_param['L']),      # robot model with length L
                                                      ekf_param['update_sources'],
                                                      ekf_param['prediction_sources'])
 
@@ -189,7 +190,7 @@ class ScribaEKFNode:
     def check_ekf_params(self, param_dict):
         """Check if all parameters needed for EKF creation are present"""
 
-        param_keys = ['Fu', 'Fx', 'update_sources', 'prediction_sources']
+        param_keys = ['L', 'update_sources', 'prediction_sources']
         if not all([key in param_dict.keys() for key in param_keys]):
             rospy.logerr("Cannot initialize, missing parameter in position EKF")
             return False

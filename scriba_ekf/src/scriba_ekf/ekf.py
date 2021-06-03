@@ -11,7 +11,7 @@ class ExtendedKalmanFilter:
     of the sensor readings (covariance of the sensor and not of the measurement)
     """
 
-    def __init__(self, Fu, Fx, update_sources, prediction_sources):
+    def __init__(self, robot_model, update_sources, prediction_sources):
         """
         Create the EKF given the updade source
 
@@ -28,8 +28,7 @@ class ExtendedKalmanFilter:
                 Q: Covariance matrix of the prediction, numpy matrix
         """
 
-        self.Fu = Fu
-        self.Fx = Fx
+        self.robot_model = robot_model
 
         # # Create prediction source handles
         # self.predict_sources_dict = {}
@@ -108,8 +107,11 @@ class ExtendedKalmanFilter:
         """Predict step of the filter given a value and the associated covariance"""
 
         # Compute new estimate
-        self.estimate = self.estimate + u
+        self.estimate = self.robot_model.F(self.estimate, u)
+        
         # Compute new estimate covariance
-        self.estimate_covariance = np.matmul(self.Fx, np.matlmul(self.estimate_covariance, self.Fx.transpose()) + np.matmul(self.Fu, np.matlmul(self.u_cov, self.Fu.transpose())
+        Fx = self.robot_model.Fx(self.estimate, u)
+        Fu = self.robot_model.Fu(self.estimate, u)
+        self.estimate_covariance = np.matmul(Fx, np.matlmul(self.estimate_covariance, Fx.transpose()) + np.matmul(Fu, np.matlmul(self.u_cov, Fu.transpose())
 
 
