@@ -1,0 +1,30 @@
+ekf_params:
+    # Robot length from rear wheel axle to front wheel
+    L: 0.2156
+    
+    # Absolute localization sources
+    update_sources:
+        front_camera:
+            # localization fix topic
+            topic: "front_camera/localization_fix"
+            # noise covariance matrix
+            R: [0.025, 0,     0,
+                0,     0.025, 0,
+                0,     0,     0.025]
+            # transform between localization fix frame and robot body frame
+            #T: [0, 1, 0, -0.092, 1, 0, 0, -0.22, 0, 0, -1, 0, 0, 0, 0, 1]
+            T: [1, 0,  0,  0,
+                0, 1,  0,  0,
+                0, 0,  1,  0,
+                0, 0,  0,  1]
+            # max Mahalanobis distance
+            max_distance: 3.0
+            
+    # Relative localization sources
+    prediction_sources:
+        odometry:
+            # motion data topic
+            topic: "odometry_motion"
+            # motion noise
+            Q: [0.07,   0,
+                0,   0.04]

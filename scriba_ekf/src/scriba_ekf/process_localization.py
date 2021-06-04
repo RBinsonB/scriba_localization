@@ -8,7 +8,10 @@ def mahalanobis_distance(innovation, innovation_cov):
     innovation: localization difference between the previous estimate and the current localization fix numpy.array([x, y, theta])
     innovation_cov: innovation covariance as a numpy matrix (3,3)
     """
-    return np.matmul(innovation.transpose(), np.matmul(linalg.inv(innovation_cov), innovation))
+    print("Innovation is: \n{}".format(innovation))
+
+    print("Mahalanobis distance is: {}".format(np.matmul(innovation.transpose(), np.matmul(np.linalg.inv(innovation_cov), innovation))))
+    return np.matmul(innovation.transpose(), np.matmul(np.linalg.inv(innovation_cov), innovation))
 
 def is_close(x, y, rtol=1.e-5, atol=1.e-8):
     """
@@ -26,15 +29,15 @@ def euler_angles_from_rotation_matrix(R):
     theta_x = 0.0
     if is_close(R[2,0],-1.0):
         theta_y = np.pi/2.0
-        theta_x = np.atan2(R[0,1],R[0,2])
+        theta_x = np.arctan2(R[0,1],R[0,2])
     elif is_close(R[2,0],1.0):
         theta_y = -np.pi/2.0
-        theta_x = np.atan2(-R[0,1],-R[0,2])
+        theta_x = np.arctan2(-R[0,1],-R[0,2])
     else:
-        theta_y = -np.asin(R[2,0])
+        theta_y = -np.arcsin(R[2,0])
         cos_theta = np.cos(theta_y)
-        theta_x = np.atan2(R[2,1]/cos_theta, R[2,2]/cos_theta)
-        theta_z = np.atan2(R[1,0]/cos_theta, R[0,0]/cos_theta)
+        theta_x = np.arctan2(R[2,1]/cos_theta, R[2,2]/cos_theta)
+        theta_z = np.arctan2(R[1,0]/cos_theta, R[0,0]/cos_theta)
     return theta_x, theta_y, theta_z
 
 
@@ -59,7 +62,7 @@ class LocalizationFixHandler:
     def handle_localization_fix(self, localization_fix):
         """handle the localization fix (transform to proper frame, additional checks..."""
 
-        if localization_fix: # if no localization error
+        if localization_fix is not None: # if no localization error
             return self.transform_to_body_frame(localization_fix)
 
 
@@ -69,7 +72,7 @@ class LocalizationFixHandler:
         """
 
         # Create 3D vector for transform
-        coord = np.append(localization_fix[:2], 0, 1).reshape(3,1)
+        coord = np.append(localization_fix[:2], [0, 1]).reshape(4,1)
 
         # Apply transform matrix on coordinates
         transformed_coord = np.matmul(self.T, coord)
@@ -77,8 +80,8 @@ class LocalizationFixHandler:
         # Apply rotation matrix on angle
         ## Create rotation matrix of theta angle
         R_theta = np.array([np.cos(localization_fix[2]), -np.sin(localization_fix[2]), 0,
-                           np.sin(localization_fix[2]),  np.cos(localization_fix[2]), 0,
-                           0, 0, 1]).reshape(3,3)
+                            np.sin(localization_fix[2]),  np.cos(localization_fix[2]), 0,
+                            0, 0, 1]).reshape(3,3)
         transformed_rot = np.matmul(self.T[:3,:3], R_theta)
         roll, pitch, yaw = euler_angles_from_rotation_matrix(transformed_rot)
 

@@ -2,12 +2,12 @@
 import rospy
 import numpy as np
 
-from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped, Quaternion
 from scriba_msgs.msg import localization_fix, motion_odom
 
 from scriba_ekf.ekf import ExtendedKalmanFilter
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
-from tf2 import TransformBroadcaster
+from tf2_ros import TransformBroadcaster
 
 from scriba_ekf.robot_model import ScribaRobotModel
 
@@ -48,7 +48,7 @@ class ScribaEKFNode:
         frequency: loop frequency in Hz
         """
         r = rospy.Rate(frequency)
-        while rospy.not_shutdown():
+        while not rospy.is_shutdown():
             # Publish output of filter
             self.publish_pose_estimate()
 
@@ -65,7 +65,7 @@ class ScribaEKFNode:
         """
 
         # Output publisher
-        self.output_pub = rospy.Publisher("~estimated_pose", PoseWithCovarianceStamped)
+        self.output_pub = rospy.Publisher("~estimated_pose", PoseWithCovarianceStamped, queue_size=10)
 
         # Output TF broadcaster
         self.output_tf_broadcaster = TransformBroadcaster()
@@ -82,7 +82,7 @@ class ScribaEKFNode:
     def set_initial_from_param(self):
         """Set initial EKF value using parameters"""
 
-        set_initial(self.initial_pose, self.initial_cov)
+        self.set_initial(self.initial_pose, self.initial_cov)
 
     
     def handle_initial_pose_msg(self, initial_pose_msg):
@@ -110,7 +110,7 @@ class ScribaEKFNode:
         rospy.loginfo("Scriba position EKF: initializing with initial pose: (x: {0}, y:{1}, theta: {2}) and covariance:\n{3}".format(initial_pose[0],
                                                                                                                                      initial_pose[1],
                                                                                                                                      initial_pose[2],
-                                                                                                                                     covariance_2d))
+                                                                                                                                     initial_cov))
         self.position_ekf.initialize(initial_pose, initial_cov)
 
 
@@ -145,7 +145,7 @@ class ScribaEKFNode:
         initial_cov_yy = rospy.get_param("~initial_cov_yy ", 0.025)
         initial_cov_aa = rospy.get_param("~initial_cov_aa ", 0.07)
         self.initial_cov = np.array([initial_cov_xx, 0, 0,
-                                     0, initial_cov_yy, 0
+                                     0, initial_cov_yy, 0,
                                      0, 0, initial_cov_aa]).reshape(3,3)
 
         #return EKF parameters dictionary
@@ -160,7 +160,7 @@ class ScribaEKFNode:
         pose_output_msg.header.stamp = rospy.Time.now()
         pose_output_msg.pose.pose.position.x = self.position_ekf.estimate[0]
         pose_output_msg.pose.pose.position.y = self.position_ekf.estimate[1]
-        pose_output_msg.pose.pose.position.orientation = quaternion_from_euler(self.position_ekf.estimate[2].to_list())
+        pose_output_msg.pose.pose.orientation = Quaternion(*quaternion_from_euler(0, 0, self.position_ekf.estimate[2]))
         pose_output_msg.pose.covariance[0] = self.position_ekf.estimate_covariance[0,0]
         pose_output_msg.pose.covariance[7] = self.position_ekf.estimate_covariance[1,1]
         pose_output_msg.pose.covariance[35] = self.position_ekf.estimate_covariance[2,2]
@@ -169,7 +169,7 @@ class ScribaEKFNode:
         self.output_pub.publish(pose_output_msg)
 
         if self.publish_tf:
-            broadcast_tf_from_pose(pose_output_msg)
+            self.broadcast_tf_from_pose(pose_output_msg)
             
 
     def broadcast_tf_from_pose(self, stamped_pose_with_cov_msg):
@@ -203,7 +203,7 @@ class ScribaEKFNode:
                     return False
 
             # Check prediction sources
-            for source_key, source in param_dict['predictions_sources'].items():
+            for source_key, source in param_dict['prediction_sources'].items():
                 predict_source_keys = ['Q', 'topic']
                 if not all([key in source.keys() for key in predict_source_keys]):
                     rospy.logerr("Cannot initialize, missing parameter in position EKF predict source {0}".format(source_key))

@@ -1,0 +1,10 @@
+<launch>
+  <arg name="init_pose_from_param" default="true"/>
+  
+  <!-- EKF node -->
+  <node pkg="scriba_ekf" name="scriba_ekf" type="ekf_scriba_node.py" output="screen">
+    <param name="init_pose_from_param" value="$(arg init_pose_from_param)" />
+    <rosparam command="load" file="$(find scriba_ekf)/config/scriba_ekf_params.yaml" />
+  </node>
+
+</launch>

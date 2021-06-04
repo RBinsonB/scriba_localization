@@ -4,6 +4,25 @@ import numpy as np
 
 from scriba_ekf.process_localization import LocalizationFixHandler
 
+def angle_diff(a, b):
+    """Return the relative difference between two angles (a-b) by wrapping around"""
+
+    angle_diff = wrap_angle_positive(a) - wrap_angle_positive(b)
+    if angle_diff < -np.pi:
+        angle_diff += 2*np.pi
+    if angle_diff > np.pi:
+        angle_diff -= 2*np.pi
+
+    return angle_diff
+
+def wrap_angle_positive(a):
+    """Wrap an angle to a positive [0, 360) representation"""
+
+    a = np.fmod(a + 2*np.pi, 2*np.pi)
+    if a < 0:
+        a += 2*np.pi
+    return a
+
 
 class ExtendedKalmanFilter:
     """Extended Kalman Filter (EKF) class for the Scriba robot
@@ -29,6 +48,8 @@ class ExtendedKalmanFilter:
         """
 
         self.robot_model = robot_model
+        self.update_sources = update_sources
+        self.predict_sources = prediction_sources
 
         # # Create prediction source handles
         # self.predict_sources_dict = {}
@@ -38,7 +59,9 @@ class ExtendedKalmanFilter:
         # Create update source handles
         self.update_sources_dict = {}
         for source, src_args in update_sources.items():
-            self.update_sources_dict.update(source : LocalizationFixHandler(src_args))
+            self.update_sources_dict.update({source : LocalizationFixHandler(np.array(src_args['R']).reshape((3,3)),
+                                                                             np.array(src_args['T']).reshape((4,4)),
+                                                                             src_args['max_distance'])})
 
         self.estimate = None 
         self.estimate_covariance = None
@@ -62,20 +85,24 @@ class ExtendedKalmanFilter:
 
         if update_source in self.update_sources_dict:
             # Get innovation from localization fix
-            innovation = self.compute_innovation(self.update_sources_dict[update_source].LocalizationFixHandler(localization_fix))
+            innovation = self.compute_innovation(self.update_sources_dict[update_source].handle_localization_fix(localization_fix))
             # Check if innovation is valid
             if self.update_sources_dict[update_source].check_validation_gate(innovation):
                 # Update EKF
-                self.update_filter(innovation, update_sources[update_source]['R'])
+                self.update_filter(innovation, np.array(self.update_sources[update_source]['R']).reshape((3,3)))
 
-    def update_filter(self, innovation, innovation_cov):
+    def update_filter(self, innovation, measurement_cov):
         """Update the filter given an innovation and the associated covariance"""
 
         # Compute Kalman gain using sensor covariance
+        innovation_cov = self.estimate_covariance + measurement_cov
+        print("innovation_cov is \n{}",format(innovation_cov))
         K = self.compute_kalman_gain(innovation_cov)
         # Compute new estimate
         self.estimate = self.estimate + np.matmul(K, innovation)
         # Compute new estimate covariance
+        print("cov variation")
+        print(np.matmul(K, np.matmul(innovation_cov, K.transpose())))
         self.estimate_covariance = self.estimate_covariance - np.matmul(K, np.matmul(innovation_cov, K.transpose()))
 
 
@@ -85,33 +112,35 @@ class ExtendedKalmanFilter:
         Keyword arguments:
         localization_fix: numpy.array([x, y, theta])
         """
+        print("Estimate is {0} and localization is {1}".format(self.estimate,localization_fix))
 
-        if self.estimate:
-            return localization_fix - self.estimate
+        if self.estimate is not None:
+            innovation = np.zeros(3)
+            innovation[:2] = localization_fix[:2] - self.estimate[:2]
+            innovation[2] = angle_diff(localization_fix[2], self.estimate[2])
+            return innovation
 
-    def compute_kalman_gain(innovation_cov):
+    def compute_kalman_gain(self, innovation_cov):
         """Compute the Kalman gain given the innovation covariance"""
         
-        if self.estimate_covariance:
+        if self.estimate_covariance is not None:
             return np.matmul(self.estimate_covariance, np.linalg.inv(innovation_cov))
 
 
     def position_prediction(self, prediction_source, u):
         """Predict the position given an odometry estimate"""
 
-        if prediction_source in self.predict_sources_dict:
-            if self.estimate and self.estimate_covariance:
-                self.predict(u, self.predict_sources_dict[prediction_source]['Q'])
+        if prediction_source in self.predict_sources:
+            if self.estimate is not None and self.estimate_covariance is not None:
+                self.predict(u, np.array(self.predict_sources[prediction_source]['Q']).reshape((2,2)))
 
-    def prefict(self, u, u_cov):
+    def predict(self, u, u_cov):
         """Predict step of the filter given a value and the associated covariance"""
 
         # Compute new estimate
         self.estimate = self.robot_model.F(self.estimate, u)
-        
+
         # Compute new estimate covariance
         Fx = self.robot_model.Fx(self.estimate, u)
         Fu = self.robot_model.Fu(self.estimate, u)
-        self.estimate_covariance = np.matmul(Fx, np.matlmul(self.estimate_covariance, Fx.transpose()) + np.matmul(Fu, np.matlmul(self.u_cov, Fu.transpose())
-
-
+        self.estimate_covariance = np.matmul(Fx, np.matmul(self.estimate_covariance, Fx.transpose())) + np.matmul(Fu, np.matmul(u_cov, Fu.transpose()))

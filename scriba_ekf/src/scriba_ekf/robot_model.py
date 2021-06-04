@@ -20,7 +20,6 @@ class ScribaRobotModel:
             phi: steer angle of the front wheel (in rad)
             dwf: traveled distance of the front wheel (in m)
         """
-
         x = state[0]
         y = state[1]
         theta = state[2]
@@ -32,7 +31,7 @@ class ScribaRobotModel:
         sin_theta = np.sin(theta)
         
         # If driving in a straight line
-        if phi == 0:
+        if phi == 0.0:
             omega = 0.0
             dx = dwf
             dy = 0.0
@@ -44,9 +43,15 @@ class ScribaRobotModel:
             dx = self.L * (cos_phi/sin_phi) * np.sin(omega)
             dy = self.L * (cos_phi/sin_phi) * (1-np.cos(omega))
 
+        print("F:")
+        print(np.array([x + (cos_theta * dx - sin_theta * dy),
+                         y + (sin_theta * dx + cos_theta * dy),
+                         (theta + omega) % 2*np.pi]))
+
         return np.array([x + (cos_theta * dx - sin_theta * dy),
                          y + (sin_theta * dx + cos_theta * dy),
-                         (theta + omega) % 2*np.pi]) # Use modulo to wrap the value to 2 pi max
+                         (theta + omega)])
+                         #(theta + omega) % 2*np.pi]) # Use modulo to wrap the value to 2 pi max
 
     def Fu(self, state, motion):
         """Robot model jacobian to motion vector
@@ -65,7 +70,7 @@ class ScribaRobotModel:
         sin_theta = np.sin(theta)
 
         # If driving in a straight line
-        if phi == 0:
+        if phi == 0.0:
             return np.array([0, cos_theta,
                              0, sin_theta,
                              0, 0]).reshape(3,2)
@@ -100,12 +105,12 @@ class ScribaRobotModel:
         dwf = motion[1]
 
         # If driving in a straight line
-        if phi == 0:
+        if phi == 0.0:
             return np.array([1, 0, -np.sin(theta)*dwf,
                              0, 1,  np.cos(theta)*dwf,
                              0, 0, 1]).reshape(3,3)
         else:
-            elem1 = (L*theta + dwf*np.sin(phi))/self.L
+            elem1 = (self.L*theta + dwf*np.sin(phi))/self.L
             tan_phi = np.tan(phi)
 
 
