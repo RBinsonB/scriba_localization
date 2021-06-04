@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 import sys, math, os
 from sensor_msgs.msg import CameraInfo, Image
+from geometry_msgs.msg import PoseWithCovarianceStamped
+from scriba_msgs.msg import localization_fix
 from cv_bridge import CvBridge, CvBridgeError
 
 # Dynamic reconfigure parameters
@@ -26,6 +28,8 @@ class scribaCamImager:
         self.cvbridge = CvBridge()
 
         self.i = 0
+        self.lookup_area = None
+        self.localization_msg = localization_fix()
 
         # Load map and create localizer object
         self.textmap = cv2.imread(self.map_picture_path)
@@ -41,7 +45,7 @@ class scribaCamImager:
             # Publish processed image
             self.processed_img_pub.publish(self.cvbridge.cv2_to_imgmsg(camera_img, "mono8"))
 
-            self.localization(camera_img)
+            self.localization(camera_img, self.lookup_area)
 
         except CvBridgeError as e:
             rospy.logerr(e)
@@ -50,13 +54,20 @@ class scribaCamImager:
         self.i = self.show_and_save(camera_img, i)
 
 
-    def localization(self, img):
+    def localization(self, img, lookup_area):
         """localize the image within a map"""
         map_visu = self.textmap.copy()
         axis_length = 100
         try:
-            (x, y, theta) = self.localizer.localize(img)
+            # Get localization
+            (x, y, theta) = self.localizer.localize(img, lookup_area)
             print(x, y, theta)
+
+            # Populate and publish message
+            self.localization_msg.x = x
+            self.localization_msg.y = y
+            self.localization_msg.theta = theta
+            self.localization_pub.publish(self.localization_msg)
 
             # Draw the coordinate frame
             # x
@@ -114,9 +125,23 @@ class scribaCamImager:
         """Setup ROS publishers and subscribers"""
 
         # Processed image publisher
-        self.processed_img_pub = rospy.Publisher("process_image", Image, queue_size = 20)
+        self.processed_img_pub = rospy.Publisher("processed_image", Image, queue_size = 20)
+        # Localization publisher
+        self.localization_pub = rospy.Publisher("localization_fix", localization_fix, queue_size = 20)
         # Camera stream subscriber
-        self.camera_stream_sub = rospy.Subscriber("image_raw", Image)
+        self.camera_stream_sub = rospy.Subscriber("image_raw", Image, self.handle_camera_stream)
+
+        if self.use_lookup_area:
+            self.robot_pose_sub = rospy.Subscriber("/robot_pose_estimate", PoseWithCovarianceStamped)
+
+    def pose_estimate_callback(self, pose_msg = PoseWithCovarianceStamped):
+        None #TODO
+
+
+    def get_lookup_area(self, pose):
+        """Generate lookup area based on camera resolution, pose estimate and m-to-pixel ratio"""
+
+        None #TODO
 
     def init_params(self):
         """Get params from ROS param server, topics and config files"""
@@ -124,6 +149,9 @@ class scribaCamImager:
         # Get map file path
         self.map_picture_path = os.path.join(rospkg.RosPack().get_path(rospy.get_param('~map_file/package','scriba_localization')),
                                                                        rospy.get_param('~map_file/path','config/map/textmap.png'))
+
+        # Use location estimation to weight feature detection
+        self.use_lookup_area = rospy.get_param('use_lookup_area', False)
 
         # Camera m to pixel scale
         self.camera_img_scale = rospy.get_param("camera_img_scale", 10000)
