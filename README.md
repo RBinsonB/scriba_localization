@@ -1,8 +1,8 @@
 # scriba_localization
 The Scriba robot localization ROS packages.
 
-- **scriba_ekf** provides a position EKF for the robot
-- **scriba_vision** provides a position estimation from the robot camera
+- [**scriba_ekf**](/README.md#scriba_ekf) provides a position EKF for the robot
+- [**scriba_vision**](/README.md#scriba_vision)  provides a position estimation from the robot camera
 
 Next steps:
 - Use the calibration rig to get sensor covariance
