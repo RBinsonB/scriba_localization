@@ -51,29 +51,36 @@ and
 
 ## Usage
 
+## Config files
+- **scriba_ekf_params.yaml** Default EKF configuration for fusing odometry and localization measurement from the front camera.
+
+## Launch files
+- **scriba_ekf.launch**: Run the EKF node with the default configuration for fusing odometery and localization measurement from the front camra.
+    - `init_pose_from_param` If true, get initial pose and covariance from parameters. Default: `true`.
+
 ## Nodes
 ### ekf_scriba_node.py
 Position EKF node for the Scriba robot. Publishes a position estimation at a fixed frequency using inputs from the odometry and external localization sources (camera, ...). The node inputs are modular an allow for a range of sensor to be fused as long as they provide their localization measurement on the same format.
 
 #### Subscribed Topics
-- `update source topic` ([scriba_msgs/localization_fix](/TODO)
+- `update source topic` ([scriba_msgs/localization_fix](/TODO))
     
     A topic for every update source for the filter. Update is on the form of a "localization_fix", a 2D pose with covariance (x, y, yaw angle). Topic name is set by the parameter `update_sources/<update_source>/topic`. The topic triggers the update step of the EKF.
     
-- `prediction source topic` ([scriba_msgs/motion_odom](/TODO)
+- `prediction source topic` ([scriba_msgs/motion_odom](/TODO))
     
     A topic for every prediction source for the filter. Prediction data is on the form of a "motion_odom" message, a motion data vector with covariance (front wheel steer angle `phi`, front wheel traveled distance `dfw`). Topic name is set by the parameter `prediction_sources/<prediction_source>/topic`. The topic triggers the prediction step of the EKF.
     
-- `initialpose` ([scriba_msgs/motion_odom]([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html) 
+- `initialpose` ([scriba_msgs/motion_odom]([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html))
     
     Initial pose and covariance of the filter. Only taken in account if parameter `~init_pose_from_param` is set to false.
     
 #### Published Topics
-- `~estimated_pose` ([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html)
+- `~estimated_pose` ([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html))
     
     Estimated pose by the EKF with covariance.
 
-- `tf` ([geometry_msgs/TransformStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/TransformStamped.html)
+- `tf` ([geometry_msgs/TransformStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/TransformStamped.html))
     
     If parameters `publish_tf` set to true, publishes the pose as a transform from `map` to `base_link`.
     
@@ -121,7 +128,7 @@ Position EKF node for the Scriba robot. Publishes a position estimation at a fix
 - `~ekf_params/update_sources` (dictionary)
 
    Dictionary of all update sources (absolute measurement sources). Each source is a dictionary of its own of the format:
-   `<update_source>`
+   - `<update_source>`
      - `topic` (string): topic name for the update source
      - `R` (double[9]): 3x3 covariance matrix for the sensor noise. will be used if the sensor doesn't provide covariance for its measurement.
      - `T` (double[16]): Transform matrix (4x4) between localization fix frame and robot body frame.
@@ -130,13 +137,9 @@ Position EKF node for the Scriba robot. Publishes a position estimation at a fix
 - `~ekf_params/prediction_sources` (dictionary)
 
    Dictionary of all prediction sources (relative measurement sources). Each source is a dictionary of its own of the format:
-   `<prediction_source>`.
-     - `topic` (string): topic name for the prediction source.
-     - `Q` (double[4]): 2x2 covariance matrix for the predicion step noise. will be used if the sensor doesn't provide covariance for its measurement.
-      
-
-## Launch files
-
+   - `<prediction_source>`
+      - `topic` (string): topic name for the prediction source.
+      - `Q` (double[4]): 2x2 covariance matrix for the predicion step noise. will be used if the sensor doesn't provide covariance for its measurement.
 
 # scriba_vision
 Provide a localization fix using the robot camera. The localization is based on SIFT feature identification and matching
