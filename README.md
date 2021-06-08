@@ -52,6 +52,88 @@ and
 ## Usage
 
 ## Nodes
+### ekf_scriba_node.py
+Position EKF node for the Scriba robot. Publishes a position estimation at a fixed frequency using inputs from the odometry and external localization sources (camera, ...). The node inputs are modular an allow for a range of sensor to be fused as long as they provide their localization measurement on the same format.
+
+#### Subscribed Topics
+- `update source topic` ([scriba_msgs/localization_fix](/TODO)
+    
+    A topic for every update source for the filter. Update is on the form of a "localization_fix", a 2D pose with covariance (x, y, yaw angle). Topic name is set by the parameter `update_sources/<update_source>/topic`. The topic triggers the update step of the EKF.
+    
+- `prediction source topic` ([scriba_msgs/motion_odom](/TODO)
+    
+    A topic for every prediction source for the filter. Prediction data is on the form of a "motion_odom" message, a motion data vector with covariance (front wheel steer angle `phi`, front wheel traveled distance `dfw`). Topic name is set by the parameter `prediction_sources/<prediction_source>/topic`. The topic triggers the prediction step of the EKF.
+    
+- `initialpose` ([scriba_msgs/motion_odom]([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html) 
+    
+    Initial pose and covariance of the filter. Only taken in account if parameter `~init_pose_from_param` is set to false.
+    
+#### Published Topics
+- `~estimated_pose` ([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html)
+    
+    Estimated pose by the EKF with covariance.
+
+- `tf` ([geometry_msgs/TransformStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/TransformStamped.html)
+    
+    If parameters `publish_tf` set to true, publishes the pose as a transform from `map` to `base_link`.
+    
+#### Parameters
+- `~frequency` (int, default: 50)
+
+    Node publish frequency. Careful: not the filter update/prediction step frequency (message triggered).
+    
+- `~init_pose_from_param` (bool, default: false)
+
+    If true, will use the initial pose and covariance parameters to initialize the filter. If false, will get initial pose and covariance from topic.
+    
+- `~publish_tf` (bool, default: true)
+.
+    If true, published estimated pose as transform between `map` and `base_link`
+    
+- `~initial_pose_x` (double, default: 0.0 meters) 
+ 
+    Initial pose mean (x), used to initialize filter with Gaussian distribution.
+
+- `~initial_pose_ỳ` (double, default: 0.0 meters) 
+ 
+    Initial pose mean (y), used to initialize filter with Gaussian distribution.
+    
+- `~initial_pose_theta` (double, default: 0.0 radians) 
+ 
+    Initial pose mean (yaw), used to initialize filter with Gaussian distribution.
+
+- `~initial_cov_xx` (double, default: 0.05*0.05 meters)
+
+    Initial pose covariance (x*x), used to initialize filter with Gaussian distribution.
+
+- `~initial_cov_yy` (double, default: 0.05*0.05 meters)
+
+    Initial pose covariance (y*y), used to initialize filter with Gaussian distribution.
+    
+- `~initial_cov_aa` (double, default: 0.07 radians²)
+
+    Initial pose covariance (theta*theta), used to initialize filter with Gaussian distribution.
+
+- `~ekf_params/L` (double)
+
+    Length of the robot from rear wheel axle to front wheel axis.
+    
+- `~ekf_params/update_sources` (dictionary)
+
+   Dictionary of all update sources (absolute measurement sources). Each source is a dictionary of its own of the format:
+   `<update_source>`
+      |- `topic` (string): topic name for the update source
+      |- `R` (double[9]): 3x3 covariance matrix for the sensor noise. will be used if the sensor doesn't provide covariance for its measurement.
+      |- `T` (double[16]): Transform matrix (4x4) between localization fix frame and robot body frame.
+      |- `max_distance` (double): Max Mahalanobis distance for the validation gate.
+      
+- `~ekf_params/prediction_sources` (dictionary)
+
+   Dictionary of all prediction sources (relative measurement sources). Each source is a dictionary of its own of the format:
+   `<prediction_source>`
+      |- `topic` (string): topic name for the prediction source
+      |- `Q` (double[9]): 3x3 covariance matrix for the predicion step noise. will be used if the sensor doesn't provide covariance for its measurement.
+      
 
 ## Launch files
 
