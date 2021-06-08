@@ -122,17 +122,17 @@ Position EKF node for the Scriba robot. Publishes a position estimation at a fix
 
    Dictionary of all update sources (absolute measurement sources). Each source is a dictionary of its own of the format:
    `<update_source>`
-      |- `topic` (string): topic name for the update source
-      |- `R` (double[9]): 3x3 covariance matrix for the sensor noise. will be used if the sensor doesn't provide covariance for its measurement.
-      |- `T` (double[16]): Transform matrix (4x4) between localization fix frame and robot body frame.
-      |- `max_distance` (double): Max Mahalanobis distance for the validation gate.
+     - `topic` (string): topic name for the update source
+     - `R` (double[9]): 3x3 covariance matrix for the sensor noise. will be used if the sensor doesn't provide covariance for its measurement.
+     - `T` (double[16]): Transform matrix (4x4) between localization fix frame and robot body frame.
+     - `max_distance` (double): Max Mahalanobis distance for the validation gate.
       
 - `~ekf_params/prediction_sources` (dictionary)
 
    Dictionary of all prediction sources (relative measurement sources). Each source is a dictionary of its own of the format:
-   `<prediction_source>`
-      |- `topic` (string): topic name for the prediction source
-      |- `Q` (double[9]): 3x3 covariance matrix for the predicion step noise. will be used if the sensor doesn't provide covariance for its measurement.
+   `<prediction_source>`.
+     - `topic` (string): topic name for the prediction source.
+     - `Q` (double[4]): 2x2 covariance matrix for the predicion step noise. will be used if the sensor doesn't provide covariance for its measurement.
       
 
 ## Launch files
