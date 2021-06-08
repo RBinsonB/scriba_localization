@@ -71,7 +71,7 @@ Position EKF node for the Scriba robot. Publishes a position estimation at a fix
     
     A topic for every prediction source for the filter. Prediction data is on the form of a "motion_odom" message, a motion data vector with covariance (front wheel steer angle `phi`, front wheel traveled distance `dfw`). Topic name is set by the parameter `prediction_sources/<prediction_source>/topic`. The topic triggers the prediction step of the EKF.
     
-- `initialpose` ([scriba_msgs/motion_odom]([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html))
+- `initialpose` ([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/melodic/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html))
     
     Initial pose and covariance of the filter. Only taken in account if parameter `~init_pose_from_param` is set to false.
     
@@ -109,17 +109,17 @@ Position EKF node for the Scriba robot. Publishes a position estimation at a fix
  
     Initial pose mean (yaw), used to initialize filter with Gaussian distribution.
 
-- `~initial_cov_xx` (double, default: 0.05*0.05 meters)
+- `~initial_cov_xx` (double, default: 0.05\*0.05 meters)
 
-    Initial pose covariance (x*x), used to initialize filter with Gaussian distribution.
+    Initial pose covariance (x\*x), used to initialize filter with Gaussian distribution.
 
-- `~initial_cov_yy` (double, default: 0.05*0.05 meters)
+- `~initial_cov_yy` (double, default: 0.05\*0.05 meters)
 
-    Initial pose covariance (y*y), used to initialize filter with Gaussian distribution.
+    Initial pose covariance (y\*y), used to initialize filter with Gaussian distribution.
     
 - `~initial_cov_aa` (double, default: 0.07 radians²)
 
-    Initial pose covariance (theta*theta), used to initialize filter with Gaussian distribution.
+    Initial pose covariance (theta\*theta), used to initialize filter with Gaussian distribution.
 
 - `~ekf_params/L` (double)
 
@@ -142,4 +142,120 @@ Position EKF node for the Scriba robot. Publishes a position estimation at a fix
       - `Q` (double[4]): 2x2 covariance matrix for the predicion step noise. will be used if the sensor doesn't provide covariance for its measurement.
 
 # scriba_vision
-Provide a localization fix using the robot camera. The localization is based on SIFT feature identification and matching
+Provide a localization fix using the robot camera. The localization is based on SIFT feature identification and matching using FLANN algorithm.
+
+<img src="/documentation/pictures/localization_screenshot.png" align="center" width="600"/>
+
+*The camera image localized on the map*
+
+<img src="/documentation/pictures/localization_test.png" align="center" width="600"/>
+
+*The robot camera pointed at the test map*
+
+## Overview
+
+### Image processing
+
+The robot localization is based on binarized image (black and white) as the robot is only able to print black ink on white paper (whitout half-toning).
+
+The image from the camera is flatten using an homography to correct for the camera position. The homography matrix is obtained during a calibration phase. The flatten imaged is then blurred and binarized using an adaptive threshold.
+
+### Localization
+
+Features are identified using SIFT on both the camera picture and the map. Features are then matched using FLANN and sorted. A maximum number of match is kept, with a feature allowing to weight matches relative to their distance to an area. At last, homography search using RANSAC algorithm allows to get rid of outliers.
+
+<img src="/documentation/pictures/feature_matching.png" align="center" width="800"/>
+
+*The matches after outliers have been removed with the homography between the camera picture and the map in red*
+
+The homography matrix from the camera picture to the map is decomposed to get its translation, rotation and shear components. The height/width ratio and the shear value are compared to tolerance values to accept or discard the localization reading.
+
+## Config files
+- **front_camera_params.yaml** Front camera parameters including homography matrix from the camera image to the floor plane.
+
+- **front_camera.yaml** Front camera base parameters.
+
+- **localization_params.yaml** Default localization parameters.
+
+- **map** Folder of the map images
+
+## Launch files
+- **camera_localization.launch**: Run the localization node with the cv_camera node.
+    - `device_id` Camera ID number for the cv_camera node. Default: `2`.
+
+    - `camera_name` Camera name for the namespace. Default: `camera`.
+
+- **front_camera_localization.launch**: Run the localization node with the cv_camera node with the the front camera parameters.
+
+## Nodes
+
+### scriba_camera_node.py
+Localize an image in a image map using SIFT feature identification and FLANN matching algorithm.
+
+#### Subscribed Topics
+
+- `image_raw` ([sensor_msgs/Image](http://docs.ros.org/en/api/sensor_msgs/html/msg/Image.html))
+    
+    Image to be localized on the map.
+
+- `camera_info` ([sensor_msgs/CameraInfo](http://docs.ros.org/en/noetic/api/sensor_msgs/html/msg/CameraInfo.html))
+
+    Camera info used to initialize the node.
+
+- `/robot_pose_estimate` ([geometry_msgs/PoseWithCovarianceStamped](http://docs.ros.org/en/api/geometry_msgs/html/msg/PoseWithCovarianceStamped.html))
+    
+    Robot pose estimate use to weight matches to favor matches within the estimated observed region.
+
+#### Published Topics
+- `~processed_image` ([sensor_msgs/Image](http://docs.ros.org/en/api/sensor_msgs/html/msg/Image.html))
+    
+    Rectified, flatten and binarized image using as localization input picture.
+
+- `~localization_fix` ([scriba_msgs/localization_fix](/TODO))
+    
+    Localization from the node.
+
+#### Parameters
+- `map_file/package` (string, default: "scriba_vision")
+
+    ROS package containing the map.
+
+- `map_file/path` (string, default: "config/map/textmap.png")
+
+    Map file path relative to the root of the package
+
+- `min_matches` (int, default: 10)
+
+    Minimum number of matches needed for a reading to be valid.
+
+- `scale_diff_tolerance` (double, default: 0.15)
+
+    Tolerance on the x-scale/y-scale ratio for a reading to be valid.
+
+- `shear_tolerance` (double, default: 0.1)
+
+    Tolerance on the shear value for a reading to be valid.
+
+- `use_lookup_area` (bool, default: false)
+
+    If true, the matches will be sorted to favour those within or close to the lookup area estimated from the pose on `/robot_pose_estimate`.
+
+- `camera_img_scale` (double, default: 10000.0)
+
+    meters-to-pixels scale ratio.
+
+- `min_threshold` (int, default: 2)
+
+    Adaptive threshold mean offset for image binarization.
+
+- `ksize_height` (int, default: 10)
+
+    Gaussian kernel height for the gaussian blur.
+
+- `ksize_width` (int, default: 10)
+
+    Gaussian kernel width for the gaussian blur.
+
+- `homography_matrix` (int, default: 10)
+
+    Homography matrix to flatten the camera image to the floor plane.

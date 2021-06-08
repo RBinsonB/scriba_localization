@@ -93,9 +93,9 @@ class scribaCamNode:
         """Setup ROS publishers and subscribers"""
 
         # Processed image publisher
-        self.processed_img_pub = rospy.Publisher("processed_image", Image, queue_size = 20)
+        self.processed_img_pub = rospy.Publisher("~processed_image", Image, queue_size = 20)
         # Localization publisher
-        self.localization_pub = rospy.Publisher("localization_fix", localization_fix, queue_size = 20)
+        self.localization_pub = rospy.Publisher("~localization_fix", localization_fix, queue_size = 20)
         # Camera stream subscriber
         self.camera_stream_sub = rospy.Subscriber("image_raw", Image, self.handle_camera_stream)
 
