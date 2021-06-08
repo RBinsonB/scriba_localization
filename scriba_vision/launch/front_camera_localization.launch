@@ -1,0 +1,11 @@
+<launch>
+  <!-- Load from camera parameters -->
+  <rosparam command="load" file="$(find scriba_vision)/config/front_camera_params.yaml" ns="front_camera" />
+  
+  <!-- Launch camera nodes -->
+  <include file="$(find scriba_vision)/launch/camera_localization.launch">
+    <arg name="device_id" value="2" />
+    <arg name="camera_name" value="front_camera" />
+  </include> 
+
+</launch>

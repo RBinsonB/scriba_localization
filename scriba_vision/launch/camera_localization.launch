@@ -1,0 +1,12 @@
+<launch>
+  <arg name="device_id" default="2" />
+  <arg name="camera_name" default="camera" />
+  
+  <!-- ROS camera node -->
+  <node pkg="cv_camera" type="cv_camera_node" name="$(arg camera_name)" output="screen">
+    <param name="device_id" value="$(arg device_id)" />
+  </node>
+   <!-- Scriba camera localization node -->
+  <node pkg="scriba_vision" type="scriba_camera_node.py" name="$(arg camera_name)_localization" ns="$(arg camera_name)" output="screen" />
+  
+</launch>

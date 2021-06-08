@@ -1,0 +1,9 @@
+# Map file path
+mapfile:
+    package: "scriba_vision"
+    path: "config/map/textmap.png"
+
+# Image localization parameters
+min_matches: 10
+scale_diff_tolerance: 0.15
+shear_tolerance: 0.1
