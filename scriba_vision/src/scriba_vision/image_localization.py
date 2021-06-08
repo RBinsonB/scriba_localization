@@ -44,7 +44,10 @@ class ImageLocalization:
         dst_pts = np.float32([ kp_map[m.trainIdx].pt for m in matches ]).reshape(-1,1,2)
         M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
 
-        return get_homography_components(M)
+        if M is not None:
+            return get_homography_components(M)
+        else:
+            raise ImageLocalizationError("Error in extracting homography from matches")
 
 
     def pose_from_match(self, kp_img, kp_map, matches):
@@ -60,11 +63,11 @@ class ImageLocalization:
 
         # Check if the homography scale ratio (x/y) is within the tolerances
         if not (1-self.scale_diff_tolerance < (scale[0] / scale[1]) < 1+self.scale_diff_tolerance):
-            raise ImageLocalizationError('Scale ratio ({0}) not within tolerance value ({1})'.format((scale[0] / scale[1]), self.scale_diff_tolerance))
+            raise ImageLocalizationError("Scale ratio ({0}) not within tolerance value ({1})".format((scale[0] / scale[1]), self.scale_diff_tolerance))
 
         # Check if the homography shear is within the tolerance
         if abs(shear) > self.shear_tolerance:
-            raise ImageLocalizationError('Shear value ({0}) above tolerance value ({1})'.format(abs(shear), self.shear_tolerance))
+            raise ImageLocalizationError("Shear value ({0}) above tolerance value ({1})".format(abs(shear), self.shear_tolerance))
 
         # If all checks passed, return pose as (x, y, rotation)
         else:

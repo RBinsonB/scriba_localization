@@ -5,7 +5,7 @@ import numpy as np
 def rotate_point(point, angle):
     """Rotate a point by an angle"""
 
-    return [point[0]*np.cos(angle) - point[1]*np.sin(theta), rotated_y = point[0]*np.sin(angle) + point[1]*np.cos(theta)]
+    return [point[0]*np.cos(angle) - point[1]*np.sin(theta), point[0]*np.sin(angle) + point[1]*np.cos(theta)]
 
 
 def generate_rectangle_cnt(width, height, angle):

@@ -10,116 +10,84 @@ from cv_bridge import CvBridge, CvBridgeError
 
 # Dynamic reconfigure parameters
 from dynamic_reconfigure.server import Server as DynReconfServer
-from scriba_vision.cfg import ScribaCamConfig
-from scriba_vision.cv_utils import undistord_fisheye
+from scriba_vision.cfg import ScribaVisionConfig
+
+from scriba_vision.scriba_camera import ScribaCam
 
 from scriba_vision.image_localization import ImageLocalization
 from scriba_vision.exceptions import ImageLocalizationError
 
-class scribaCamImager:
+class scribaCamNode:
     """Main camera node, localize in relation to a given map"""
     
     def __init__(self):
         rospy.loginfo("Initializing scriba camera localization")
+        # Get camera parameters
         self.init_params()
-        self.setup_pub_sub()
 
-        dyn_reconfig_srv = DynReconfServer(ScribaCamConfig, self.dyn_reconfig_callback)
+        # Create camera object from parameters
+        self.scriba_cam = ScribaCam(self.img_dim, self.K, self.D, self.homography)
+
+        # Setup dynamic reconfigure server
+        dyn_reconfig_srv = DynReconfServer(ScribaVisionConfig, self.dyn_reconfig_callback)
+
+        # OpenCV-ROS bridge
         self.cvbridge = CvBridge()
 
-        self.i = 0
         self.lookup_area = None
         self.localization_msg = localization_fix()
 
         # Load map and create localizer object
-        self.textmap = cv2.imread(self.map_picture_path)
-        self.localizer = ImageLocalization(self.textmap)
+        self.load_map(self.map_picture_path)
+        self.localizer = ImageLocalization(self.img_map, self.min_matches, self.scale_diff_tolerance, self.shear_tolerance)
+
+        # Initialize ROS publishers and subscribers
+        self.setup_pub_sub()
 
 
     def handle_camera_stream(self, img_msg):
         """Handle the camera stream to extract localization"""
+
         try:
             # Get and process image for localization
-            camera_img = self.process_image(self.cvbridge.imgmsg_to_cv2(img_msg, desired_encoding='passthrough'))
-            
+            camera_img = self.scriba_cam.process_image(self.cvbridge.imgmsg_to_cv2(img_msg, desired_encoding='passthrough'), self.min_threshold, self.blur_ksize)
+
             # Publish processed image
             self.processed_img_pub.publish(self.cvbridge.cv2_to_imgmsg(camera_img, "mono8"))
 
-            self.localization(camera_img, self.lookup_area)
+            # Localization of processed image on the map
+            self.localize_and_publish(camera_img, self.lookup_area)
 
         except CvBridgeError as e:
             rospy.logerr(e)
 
-        # Show camera stream
-        self.i = self.show_and_save(camera_img, i)
+
+    def load_map(self, map_picture_path):
+        """Read image file and load it as map"""
+
+        # Load map
+        self.img_map = cv2.imread(map_picture_path)
+
+        # Check than map has been loaded properly
+        if len(self.img_map) <= 0:
+            raise ValueError("cannot initialize map, error in reading image file")
 
 
-    def localization(self, img, lookup_area):
+    def localize_and_publish(self, img, lookup_area):
         """localize the image within a map"""
-        map_visu = self.textmap.copy()
-        axis_length = 100
+
         try:
             # Get localization
             (x, y, theta) = self.localizer.localize(img, lookup_area)
-            print(x, y, theta)
+            rospy.logdebug("Got localization x: {0}, y: {1}, theta: {2}".format(x, y, theta))
 
             # Populate and publish message
             self.localization_msg.x = x
             self.localization_msg.y = y
             self.localization_msg.theta = theta
             self.localization_pub.publish(self.localization_msg)
-
-            # Draw the coordinate frame
-            # x
-            cv2.arrowedLine(map_visu,
-                            (int(x),int(y)),
-                            (int(x + axis_length*math.cos(theta)), int(y + -axis_length*math.sin(theta) ) ),
-                            (0, 0, 255), 3, cv2.LINE_AA)
-            # y
-            cv2.arrowedLine(map_visu,
-                            (int(x),int(y)),
-                            (int(x + (axis_length*math.sin(theta))), int(y+ axis_length*math.cos(theta))),
-                            (0, 255, 0), 3, cv2.LINE_AA)
-
-            cv2.imshow("localization", map_visu)
-            cv2.waitKey(3)
-
         except ImageLocalizationError as e:
-            print(e)
-
-
-    def process_image(self, img):
-        """Process the image so it can be used for localization"""
-
-        # Rectify fisheye distortion
-        rect = undistord_fisheye(img, self.K, self.D, self.img_dim)
-        # Flatten using homography
-        flatten = cv2.warpPerspective(rect, self.homography, self.img_dim)
-        # Convert to greyscale
-        gray = cv2.cvtColor(flatten, cv2.COLOR_BGR2GRAY)
-        # Apply filter
-        #filtered = cv2.bilateralFilter(gray, 5, 75, 75)
-        filtered = cv2.GaussianBlur(gray, (11, 11), 0)
-        # Binarized the image
-        #thresh = cv2.threshold(gray, self.min_threshold, self.max_threshold, cv2.THRESH_BINARY_INV)[1]
-        thresh = cv2.adaptiveThreshold(filtered, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, self.min_threshold)
-
-        return thresh
-
-    def show_and_save(self, img, i):
-        """Show image and save if pushing key"""
-
-        cv2.imshow("camera_stream", cv2.resize(img, (960, 540), interpolation = cv2.INTER_AREA))
-        key = cv2.waitKey(6)
-        if key:
-            if key & 0xFF == ord('p'):
-               pic_name = "saved_picture_"+str(i)+".png"
-               print("saving picture %s..." % pic_name)
-               cv2.imwrite(pic_name,thresh)
-               i = i+1
-            elif key & 0xFF == ord('q'):
-                rospy.signal_shutdown('manual shutdown')
-        return i
+            rospy.logdebug(e)
 
     def setup_pub_sub(self):
         """Setup ROS publishers and subscribers"""
@@ -147,14 +115,23 @@ class scribaCamImager:
         """Get params from ROS param server, topics and config files"""
 
         # Get map file path
-        self.map_picture_path = os.path.join(rospkg.RosPack().get_path(rospy.get_param('~map_file/package','scriba_localization')),
+        self.map_picture_path = os.path.join(rospkg.RosPack().get_path(rospy.get_param('~map_file/package','scriba_vision')),
                                                                        rospy.get_param('~map_file/path','config/map/textmap.png'))
+
+        # Image localization params
+        self.min_matches = rospy.get_param("min_matches", 10)
+        self.scale_diff_tolerance = rospy.get_param("scale_diff_tolerance", 0.15)
+        self.shear_tolerance = rospy.get_param("shear_tolerance", 0.1)
 
         # Use location estimation to weight feature detection
         self.use_lookup_area = rospy.get_param('use_lookup_area', False)
 
         # Camera m to pixel scale
         self.camera_img_scale = rospy.get_param("camera_img_scale", 10000)
+
+        # Image processing params
+        self.min_threshold = rospy.get_param("min_threshold", 2)
+        self.blur_ksize = (rospy.get_param("ksize_height", 10), rospy.get_param("ksize_width", 10))
 
         # Get camera info from topic
         rospy.loginfo("Waiting for camera info...")
@@ -172,10 +149,13 @@ class scribaCamImager:
         
         rospy.loginfo("Camera homography matrix:\n%s" % str(self.homography))
 
+
     def dyn_reconfig_callback(self, config, level):
-        rospy.loginfo("Reconfigure Request, min threshold: %i, max threshold: %i" % (config['min_threshold'], config['max_threshold']))
+        """Dynamic reconfigure parameter callback"""
+
+        rospy.loginfo("Reconfigure Request, min threshold: %i, blur ksize: (%i, %i)" % (config['min_threshold'], config['ksize_height'], config['ksize_width']))
         self.min_threshold = config['min_threshold']
-        self.max_threshold = config['max_threshold']
+        self.blur_ksize = (config['ksize_height'], config['ksize_width'])
 
         return config
 
@@ -198,14 +178,13 @@ class scribaCamImager:
             rospy.logerr("Camera distortion model not supported: %s" % camera_info_msg.distortion_model)
 
 
-
 #==============================
 #             Main
 #==============================
 if __name__ == '__main__':
     rospy.init_node('scriba_camera', anonymous=False)
     try:
-        scriba_cam_imager = scribaCamImager()
+        scriba_cam_node = scribaCamNode()
         rospy.spin()
     except ValueError as e:
         rospy.logerr("Scriba camera node: %s" %(e))
