@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>scriba_localization</name>
-  <version>0.0.0</version>
+  <version>1.0.0</version>
   <description>The scriba_localization package</description>
 
   <maintainer email="robin@todo.todo">robin</maintainer>
