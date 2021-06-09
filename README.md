@@ -63,11 +63,11 @@ and
 Position EKF node for the Scriba robot. Publishes a position estimation at a fixed frequency using inputs from the odometry and external localization sources (camera, ...). The node inputs are modular an allow for a range of sensor to be fused as long as they provide their localization measurement on the same format.
 
 #### Subscribed Topics
-- `update source topic` ([scriba_msgs/localization_fix](/TODO))
+- `update source topic` ([scriba_msgs/localization_fix](https://github.com/RBinsonB/scriba_ros/blob/main/scriba_msgs/msg/localization_fix.msg))
     
     A topic for every update source for the filter. Update is on the form of a "localization_fix", a 2D pose with covariance (x, y, yaw angle). Topic name is set by the parameter `update_sources/<update_source>/topic`. The topic triggers the update step of the EKF.
     
-- `prediction source topic` ([scriba_msgs/motion_odom](/TODO))
+- `prediction source topic` ([scriba_msgs/motion_odom](https://github.com/RBinsonB/scriba_ros/blob/main/scriba_msgs/msg/motion_odom.msg))
     
     A topic for every prediction source for the filter. Prediction data is on the form of a "motion_odom" message, a motion data vector with covariance (front wheel steer angle `phi`, front wheel traveled distance `dfw`). Topic name is set by the parameter `prediction_sources/<prediction_source>/topic`. The topic triggers the prediction step of the EKF.
     
@@ -211,7 +211,7 @@ Localize an image in a image map using SIFT feature identification and FLANN mat
     
     Rectified, flatten and binarized image using as localization input picture.
 
-- `~localization_fix` ([scriba_msgs/localization_fix](/TODO))
+- `~localization_fix` ([scriba_msgs/localization_fix](https://github.com/RBinsonB/scriba_ros/blob/main/scriba_msgs/msg/localization_fix.msg))
     
     Localization from the node.
 
